@@ -202,7 +202,13 @@ class Category extends Import
             /** @var array $keys */
             $keys = [];
             if ($connection->tableColumnExists($tmpTable, 'labels-' . $local)) {
-                $connection->addColumn($tmpTable, 'url_key-' . $local, 'VARCHAR(255) NOT NULL DEFAULT ""');
+                $connection->addColumn($tmpTable, 'url_key-' . $local, [
+                    'type' => 'text',
+                    'length' => 255,
+                    'default' => '',
+                    'COMMENT' => ' ',
+                    'nullable' => false
+                ]);
 
                 /** @var \Magento\Framework\DB\Select $select */
                 $select = $connection->select()
@@ -253,12 +259,27 @@ class Category extends Import
         /** @var string $tableName */
         $tmpTable = $this->entitiesHelper->getTableName($this->getCode());
 
-        $connection->addColumn($tmpTable, 'level', 'INT(11) NOT NULL DEFAULT 0');
-        $connection->addColumn($tmpTable, 'path', 'VARCHAR(255) NOT NULL DEFAULT ""');
-        $connection->addColumn($tmpTable, 'parent_id', 'INT(11) NOT NULL DEFAULT 0');
-
-        /** @var array $stores */
-        $stores = $this->storeHelper->getStores('lang');
+        $connection->addColumn($tmpTable, 'level', [
+            'type' => 'integer',
+            'length' => 11,
+            'default' => 0,
+            'COMMENT' => ' ',
+            'nullable' => false
+        ]);
+        $connection->addColumn($tmpTable, 'path', [
+            'type' => 'text',
+            'length' => 255,
+            'default' => '',
+            'COMMENT' => ' ',
+            'nullable' => false
+        ]);
+        $connection->addColumn($tmpTable, 'parent_id', [
+            'type' => 'integer',
+            'length' => 11,
+            'default' => 0,
+            'COMMENT' => ' ',
+            'nullable' => false
+        ]);
 
         /** @var array $values */
         $values = [
@@ -268,34 +289,13 @@ class Category extends Import
         ];
         $connection->update($tmpTable, $values, 'parent IS NULL');
 
-        /** @var array $updateRewrite */
-        $updateRewrite = [];
-
-        foreach ($stores as $local => $affected) {
-            if (!$connection->tableColumnExists($tmpTable, 'url_key-' . $local)) {
-                continue;
-            }
-            $connection->addColumn(
-                $tmpTable,
-                '_url_rewrite-' . $local,
-                'VARCHAR(255) NOT NULL DEFAULT ""'
-            );
-            $updateRewrite[] = 'c1.`_url_rewrite-' . $local . '` =
-                IF(
-                    c1.`url_key-' . $local . '` <> "",
-                    TRIM(BOTH "/" FROM CONCAT(c2.`_url_rewrite-' . $local . '`, "/", c1.`url_key-' . $local . '`)),
-                    ""
-                 )';
-        }
-
         /** @var int $depth */
         $depth = self::MAX_DEPTH;
         for ($i = 1; $i <= $depth; $i++) {
             $connection->query('
                 UPDATE `' . $tmpTable . '` c1
                 INNER JOIN `' . $tmpTable . '` c2 ON c2.`code` = c1.`parent`
-                SET ' . (!empty($updateRewrite) ? join(',', $updateRewrite) . ',' : '') . '
-                    c1.`level` = c2.`level` + 1,
+                SET c1.`level` = c2.`level` + 1,
                     c1.`path` = CONCAT(c2.`path`, "/", c1.`_entity_id`),
                     c1.`parent_id` = c2.`_entity_id`
                 WHERE c1.`level` <= c2.`level` - 1
@@ -315,7 +315,13 @@ class Category extends Import
         /** @var string $tableName */
         $tmpTable = $this->entitiesHelper->getTableName($this->getCode());
 
-        $connection->addColumn($tmpTable, 'position', 'INT(11) NOT NULL DEFAULT 0');
+        $connection->addColumn($tmpTable, 'position', [
+            'type' => 'integer',
+            'length' => 11,
+            'default' => 0,
+            'COMMENT' => ' ',
+            'nullable' => false
+        ]);
 
         /** @var \Zend_Db_Statement_Interface $query */
         $query = $connection->query(
@@ -361,7 +367,7 @@ class Category extends Import
         /** @var string $tableName */
         $tmpTable = $this->entitiesHelper->getTableName($this->getCode());
 
-        if ($connection->isTableExists($connection->getTableName('sequence_catalog_category'))) {
+        if ($connection->isTableExists($this->entitiesHelper->getTable('sequence_catalog_category'))) {
             /** @var array $values */
             $values = [
                 'sequence_value' => '_entity_id',
@@ -371,7 +377,7 @@ class Category extends Import
             $connection->query(
                 $connection->insertFromSelect(
                     $parents,
-                    $connection->getTableName('sequence_catalog_category'),
+                    $this->entitiesHelper->getTable('sequence_catalog_category'),
                     array_keys($values),
                     AdapterInterface::INSERT_ON_DUPLICATE
                 )
@@ -379,7 +385,7 @@ class Category extends Import
         }
 
         /** @var string $table */
-        $table = $connection->getTableName('catalog_category_entity');
+        $table = $this->entitiesHelper->getTable('catalog_category_entity');
 
         /** @var array $values */
         $values = [
@@ -451,7 +457,7 @@ class Category extends Import
 
         $this->entitiesHelper->setValues(
             $this->getCode(),
-            $connection->getTableName('catalog_category_entity'),
+            'catalog_category_entity',
             $values,
             $entityTypeId,
             0,
@@ -478,7 +484,7 @@ class Category extends Import
                 ];
                 $this->entitiesHelper->setValues(
                     $this->getCode(),
-                    $connection->getTableName('catalog_category_entity'),
+                    'catalog_category_entity',
                     $values,
                     $entityTypeId,
                     $store['store_id']
@@ -496,13 +502,11 @@ class Category extends Import
     {
         /** @var AdapterInterface $connection */
         $connection = $this->entitiesHelper->getConnection();
-        /** @var string $tableName */
-        $tmpTable = $this->entitiesHelper->getTableName($this->getCode());
 
         $connection->query('
-            UPDATE `' . $connection->getTableName('catalog_category_entity') . '` c SET `children_count` = (
+            UPDATE `' . $this->entitiesHelper->getTable('catalog_category_entity') . '` c SET `children_count` = (
                 SELECT COUNT(`parent_id`) FROM (
-                    SELECT * FROM `' . $connection->getTableName('catalog_category_entity') . '`
+                    SELECT * FROM `' . $this->entitiesHelper->getTable('catalog_category_entity') . '`
                 ) tmp
                 WHERE tmp.`path` LIKE CONCAT(c.`path`,\'/%\')
             )
@@ -537,6 +541,9 @@ class Category extends Import
              * @var array $store
              */
             foreach ($affected as $store) {
+                if (!$store['store_id']) {
+                    continue;
+                }
                 /** @var \Magento\Framework\DB\Select $select */
                 $select = $connection->select()
                     ->from(
@@ -573,10 +580,29 @@ class Category extends Import
                         $category->getStoreId()
                     );
 
+                    /** @var string|null $exists */
+                    $exists = $connection->fetchOne(
+                        $connection->select()
+                            ->from($this->entitiesHelper->getTable('url_rewrite'), new Expr(1))
+                            ->where('entity_type = ?', CategoryUrlRewriteGenerator::ENTITY_TYPE)
+                            ->where('request_path = ?', $requestPath)
+                            ->where('store_id = ?', $category->getStoreId())
+                            ->where('entity_id <> ?', $category->getEntityId())
+                    );
+
+                    if ($exists) {
+                        $category->setUrlKey($category->getUrlKey() . '-' . $category->getStoreId());
+                        /** @var string $requestPath */
+                        $requestPath = $this->categoryUrlPathGenerator->getUrlPathWithSuffix(
+                            $category,
+                            $category->getStoreId()
+                        );
+                    }
+
                     /** @var string|null $rewriteId */
                     $rewriteId = $connection->fetchOne(
                         $connection->select()
-                            ->from($connection->getTableName('url_rewrite'), ['url_rewrite_id'])
+                            ->from($this->entitiesHelper->getTable('url_rewrite'), ['url_rewrite_id'])
                             ->where('entity_type = ?', CategoryUrlRewriteGenerator::ENTITY_TYPE)
                             ->where('entity_id = ?', $category->getEntityId())
                             ->where('store_id = ?', $category->getStoreId())
@@ -584,7 +610,7 @@ class Category extends Import
 
                     if ($rewriteId) {
                         $connection->update(
-                            $connection->getTableName('url_rewrite'),
+                            $this->entitiesHelper->getTable('url_rewrite'),
                             ['request_path' => $requestPath],
                             ['url_rewrite_id = ?' => $rewriteId]
                         );
@@ -601,7 +627,7 @@ class Category extends Import
                         ];
 
                         $connection->insertOnDuplicate(
-                            $connection->getTableName('url_rewrite'),
+                            $this->entitiesHelper->getTable('url_rewrite'),
                             $data,
                             array_keys($data)
                         );

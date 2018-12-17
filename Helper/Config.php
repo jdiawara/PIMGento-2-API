@@ -19,6 +19,7 @@ use Magento\Framework\Filesystem\Directory\WriteInterface;
 use Magento\Framework\File\Uploader;
 use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Eav\Model\Entity\Attribute\AbstractAttribute;
+use Magento\Catalog\Helper\Product as ProductHelper;
 
 /**
  * Class Config
@@ -600,5 +601,52 @@ class Config extends AbstractHelper
     public function getMediaFilePath($filename)
     {
         return Uploader::getDispretionPath($filename) . '/' . Uploader::getCorrectFileName($filename);
+    }
+
+    /**
+     * Retrieve if category is used in product URL
+     *
+     * @param int $storeId
+     *
+     * @return bool
+     */
+    public function isCategoryUsedInProductUrl($storeId = null)
+    {
+        return $this->scopeConfig->isSetFlag(
+            ProductHelper::XML_PATH_PRODUCT_URL_USE_CATEGORY,
+            ScopeInterface::SCOPE_STORE,
+            $storeId
+        );
+    }
+
+    /**
+     * Check if url_key attribute is mapped with PIM attribute
+     *
+     * @return bool
+     */
+    public function isUrlKeyMapped()
+    {
+        /** @var mixed $matches */
+        $matches = $this->scopeConfig->getValue(self::PRODUCT_ATTRIBUTE_MAPPING);
+        /** @var mixed[] $matches */
+        $matches = $this->serializer->unserialize($matches);
+        if (!is_array($matches)) {
+            return false;
+        }
+
+        /** @var mixed[] $match */
+        foreach ($matches as $match) {
+            if (!isset($match['pim_attribute'], $match['magento_attribute'])) {
+                continue;
+            }
+
+            /** @var string $magentoAttribute */
+            $magentoAttribute = $match['magento_attribute'];
+            if ($magentoAttribute === 'url_key') {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
